@@ -1,12 +1,13 @@
-from src.colorize.denoise.denoiser import FFDNetDenoiser
-from sahi.models.ultralytics import UltralyticsDetectionModel
 import torch
-import torchvision
-from src.colorize.colorizer import initialize_colorizator
-from src.constants import DEVICE
 from basicsr.archs.rrdbnet_arch import RRDBNet
+from sahi.models.ultralytics import UltralyticsDetectionModel
+
+from src.colorize.colorizer import initialize_colorizator
+from src.colorize.denoise.denoiser import FFDNetDenoiser
+from src.constants import DEVICE
 from src.enhance.realesrgan import RealESRGANer
 
+FONT_MODEL_PATH = "models/font_models/Wild-Words-Font-2/CC Wild Words Roman.ttf"
 
 # Initialize the detection model
 YOLO_MODEL = UltralyticsDetectionModel(
@@ -24,8 +25,8 @@ COLORIZER = initialize_colorizator(
 
 UPSCALE_MODEL = RealESRGANer(
     scale=4,
-    model_path='models/upscale_models/RealESRGAN_x4plus.pth',
+    model_path="models/upscale_models/RealESRGAN_x4plus.pth",
     model=RRDBNet(num_in_ch=3, num_out_ch=3, num_feat=64, num_block=23, num_grow_ch=32, scale=4),
     tile=1024,
-    half=True  # Use half precision
+    half=True,  # Use half precision
 )

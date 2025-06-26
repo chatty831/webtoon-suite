@@ -1,10 +1,12 @@
 import os
+
 import torch
 from dotenv import load_dotenv
+
 load_dotenv()
 
-DEVICE = torch.device('cuda')
-DTYPE=torch.float32
+DEVICE = torch.device("cuda")
+DTYPE = torch.float32
 
 DOMAIN_MAPS = {
     "imhentai.xxx": "",
@@ -30,3 +32,5 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 SKYLARK_API_KEY = os.environ.get("SKYLARK_API_KEY")
 SKYLARK_BASE_URL = os.environ.get("SKYLARK_BASE_URL")
+
+FASTAPI_URL = os.environ.get("FASTAPI_URL", "http://localhost:8001")

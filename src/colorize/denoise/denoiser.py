@@ -1,5 +1,4 @@
 import os
-import time
 
 import cv2
 import numpy as np
@@ -47,9 +46,10 @@ class FFDNetDenoiser:
         weights_name = "net_rgb.pth" if self.channels == 3 else "net_gray.pth"
         weights_path = os.path.join(self.weights_dir, weights_name)
         state_dict = torch.load(weights_path, map_location="cpu")
-        state_dict = {k.replace('module.', ''): v for k, v in state_dict.items()}
-        self.model = self.model.to(device=torch.device(self.device), dtype = torch.float32)
+        state_dict = {k.replace("module.", ""): v for k, v in state_dict.items()}
+        self.model = self.model.to(device=torch.device(self.device), dtype=torch.float32)
         self.model.load_state_dict(state_dict)
+
     def get_denoised_image(self, imorig, sigma=None):
         """
         Args
@@ -81,7 +81,7 @@ class FFDNetDenoiser:
         # --------------------------------------------------
         # 1) noise level σ  (scale to [0,1])
         # --------------------------------------------------
-        cur_sigma = (sigma / 255.) if sigma is not None else self.sigma
+        cur_sigma = (sigma / 255.0) if sigma is not None else self.sigma
 
         # --------------------------------------------------
         # 2) convert the input into a float tensor B×3×H×W in [0,1]
@@ -98,7 +98,7 @@ class FFDNetDenoiser:
 
             tensor = tensor.float()
             if tensor.max() > 1.2:
-                tensor = tensor / 255.
+                tensor = tensor / 255.0
         else:  # ---- NUMPY PATH
             if len(imorig.shape) < 3 or imorig.shape[2] == 1:
                 imorig = np.repeat(np.expand_dims(imorig, 2), 3, 2)
@@ -110,7 +110,7 @@ class FFDNetDenoiser:
                 imorig = normalize(imorig)  # existing helper
 
             imorig = np.expand_dims(imorig, 0)  # add batch dim
-            tensor = torch.tensor(imorig, dtype=torch.float32).to('cuda')
+            tensor = torch.tensor(imorig, dtype=torch.float32).to("cuda")
 
         # --------------------------------------------------
         # 3) pad odd spatial sizes
@@ -133,8 +133,8 @@ class FFDNetDenoiser:
         B, C, H, W = tensor.shape
 
         # Prepare tensors for aggregation of the denoised output and a weight count for overlapping regions
-        output_tensor = torch.zeros_like(tensor, device='cuda')
-        count_tensor = torch.zeros((B, 1, H, W), dtype=tensor.dtype, device='cuda')
+        output_tensor = torch.zeros_like(tensor, device="cuda")
+        count_tensor = torch.zeros((B, 1, H, W), dtype=tensor.dtype, device="cuda")
 
         tiles = []
         tile_info = []  # list of tuples: (b, start_h, end_h, start_w, end_w, tile_h, tile_w)
@@ -152,7 +152,7 @@ class FFDNetDenoiser:
                         start_w = max(0, W - tile_size)
                     end_h = min(start_h + tile_size, H)
                     end_w = min(start_w + tile_size, W)
-                    tile = tensor[b:b+1, :, start_h:end_h, start_w:end_w]
+                    tile = tensor[b : b + 1, :, start_h:end_h, start_w:end_w]
                     tile_h = tile.shape[2]
                     tile_w = tile.shape[3]
                     pad_h = tile_size - tile_h
@@ -168,10 +168,10 @@ class FFDNetDenoiser:
             tiles_batch = tensor  # fallback (should not occur)
 
         # Move tiles to the model's device
-        tiles_batch = tiles_batch.to('cuda')
+        tiles_batch = tiles_batch.to("cuda")
         with torch.no_grad():
             N_tiles = tiles_batch.size(0)
-            nsigma = torch.full((N_tiles,), cur_sigma, dtype=tiles_batch.dtype, device='cuda')
+            nsigma = torch.full((N_tiles,), cur_sigma, dtype=tiles_batch.dtype, device="cuda")
             noise_est = self.model(tiles_batch, nsigma)
             denoised_tiles = torch.clamp(tiles_batch - noise_est, 0.0, 1.0)
 

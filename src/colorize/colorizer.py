@@ -1,13 +1,11 @@
+import cv2
 import matplotlib.pyplot as plt
+import numpy as np
+import torch
+
 from colorize.colorize_model import Generator
 from src.colorize.denoise.denoiser import FFDNetDenoiser
-import torch
-import numpy as np
-import torch.nn as nn
-import subprocess
-import tempfile
-import cv2
-import base64
+
 
 def initialize_colorizator(generator_path):
     generator = Generator()
@@ -15,18 +13,20 @@ def initialize_colorizator(generator_path):
     generator.load_state_dict(gen_st_dict)
     return generator
 
+
 denoiser = FFDNetDenoiser("cuda", weights_dir="denoising")
 
-def colorize_batch(colorizer, images, device='cuda', dtype=torch.float32):
+
+def colorize_batch(colorizer, images, device="cuda", dtype=torch.float32):
     """
     Colorizes a batch of RGB images using tiled inference.
-    
+
     Parameters:
     - colorizer: The colorizer model
     - images: List of RGB images as numpy arrays
     - device: Device to run inference on
     - dtype: Data type for the model
-    
+
     Returns:
     - List of colorized RGB images
     """
@@ -40,7 +40,7 @@ def colorize_batch(colorizer, images, device='cuda', dtype=torch.float32):
         # Ensure the image is in the correct format
         if img.dtype != np.uint8:
             raise ValueError(f"Image must be of dtype np.uint8, got {img.dtype}")
-        
+
         if len(img.shape) != 3 or img.shape[2] != 3:
             raise ValueError(f"Image must be 3-channel RGB, got shape {img.shape}")
 
@@ -119,8 +119,8 @@ def colorize_batch(colorizer, images, device='cuda', dtype=torch.float32):
                 tile_out = output_tiles[tile_index]  # shape: [3, tile_size, tile_size]
                 tile_valid = tile_out[:, :valid_h, :valid_w]
 
-                output_img[:, start_h:start_h+valid_h, start_w:start_w+valid_w] += tile_valid
-                weight_map[:, start_h:start_h+valid_h, start_w:start_w+valid_w] += 1.0
+                output_img[:, start_h : start_h + valid_h, start_w : start_w + valid_w] += tile_valid
+                weight_map[:, start_h : start_h + valid_h, start_w : start_w + valid_w] += 1.0
                 tile_index += 1
 
         output_img /= weight_map

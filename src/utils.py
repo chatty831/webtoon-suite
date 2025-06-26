@@ -1,16 +1,19 @@
-from urllib.parse import urlparse
-import hashlib
 import base64
-from typing import Dict, List, Any, Union, Optional
-from PIL import Image
-import numpy as np
+import hashlib
 from io import BytesIO
+from typing import Any, Dict, List, Optional, Union
+from urllib.parse import urlparse
+
 import cv2
-from src.logger import logger
+import numpy as np
+from PIL import Image
+
 from src.colorize.colorizer import colorize_batch
-from src.enhance.upscale import upscale_image
-from src.ml_models import COLORIZER
 from src.constants import DEVICE, DTYPE
+from src.enhance.upscale import upscale_image
+from src.logger import logger
+from src.ml_models import COLORIZER
+
 
 def is_url(path: str) -> bool:
     """
@@ -45,7 +48,7 @@ def generate_cache_key(base64_image: str, translate: bool, colorize: bool, upsca
 def preprocess_images(base64_images: List[str]) -> List[np.ndarray]:
     """Decode base64 images and convert to RGB format."""
     rgb_images = []
-    
+
     for b64_img in base64_images:
         try:
             img_data = base64.b64decode(b64_img)
@@ -57,7 +60,7 @@ def preprocess_images(base64_images: List[str]) -> List[np.ndarray]:
         except Exception as e:
             logger.error(f"Error preprocessing image: {str(e)}")
             raise
-    
+
     return rgb_images
 
 
@@ -78,16 +81,15 @@ def upscale_images(images: List[np.ndarray], scale_factor: int = 3) -> List[np.n
 def convert_images_to_base64(images: List[np.ndarray]) -> List[str]:
     """Convert processed RGB images to base64 strings."""
     base64_images = []
-    
+
     for img in images:
         # Convert the image to a PIL Image
         pil_img = Image.fromarray(img)
         # Save the image to a buffer
         buffer = BytesIO()
-        pil_img.save(buffer, format='JPEG')
+        pil_img.save(buffer, format="JPEG")
         # Convert buffer to base64 string
-        base64_str = base64.b64encode(buffer.getvalue()).decode('utf-8')
+        base64_str = base64.b64encode(buffer.getvalue()).decode("utf-8")
         base64_images.append(base64_str)
-    
-    return base64_images
 
+    return base64_images

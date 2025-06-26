@@ -3,13 +3,13 @@ import base64
 import os
 import re
 from typing import Optional
-from aiolimiter import AsyncLimiter
 
+from aiolimiter import AsyncLimiter
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
-from src.logger import logger
 from llm_models import AZURE_OPENAI_GPT_MODEL
+from src.logger import logger
 
 SYS_PROMPT = """You are a multilingual manga localization expert with deep knowledge of various languages and cultures. Your task is to analyze dialogue images from manga, identify the source language, transcribe the original text, and create a high-quality English translation.
 
@@ -42,6 +42,7 @@ Rephrased Final answer
 
 
 rate_limiter = AsyncLimiter(max_rate=300, time_period=60)
+
 
 class LLMInferenceError(Exception):
     """Base exception for LLM inference errors"""
@@ -85,9 +86,7 @@ def validate_base64_image(base64_string: str) -> bool:
     wait=wait_exponential(multiplier=1, min=2, max=10),
     retry=retry_if_exception_type(ModelInferenceError),
 )
-async def gpt_ocr(
-    base64_image: str, model=None, timeout: int = 30, extract_dialogue: bool = True
-) -> Optional[str]:
+async def gpt_ocr(base64_image: str, model=None, timeout: int = 30, extract_dialogue: bool = True) -> Optional[str]:
     """
     Process an image with a LLM model and extract dialogue translation
 

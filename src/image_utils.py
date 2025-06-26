@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.spatial import ConvexHull
 
+
 # Helper functions within the main function
 def boxes_intersect(bbox1, bbox2):
     """Check if two boxes intersect"""
@@ -14,6 +15,7 @@ def boxes_intersect(bbox1, bbox2):
     # No intersection if one box is to the left/right/above/below the other
     return not (xmax1 <= xmin2 or xmax2 <= xmin1 or ymax1 <= ymin2 or ymax2 <= ymin1)
 
+
 def is_box_inside(bbox1, bbox2):
     """Check if bbox1 is completely inside bbox2"""
     x1, y1, w1, h1 = bbox1
@@ -25,6 +27,7 @@ def is_box_inside(bbox1, bbox2):
 
     # Check if bbox1 is inside bbox2
     return xmin1 >= xmin2 and ymin1 >= ymin2 and xmax1 <= xmax2 and ymax1 <= ymax2
+
 
 def calculate_iou(bbox1, bbox2):
     """Calculate Intersection over Union between two bounding boxes"""
@@ -58,6 +61,7 @@ def calculate_iou(bbox1, bbox2):
 
     return iou
 
+
 def compute_convex_hull(boxes):
     """Compute convex hull of multiple bounding boxes"""
     all_corners = []
@@ -90,6 +94,7 @@ def compute_convex_hull(boxes):
     height = ymax - ymin
     return [xmin, ymin, width, height]
 
+
 def dfs(node, graph, visited, component):
     """Depth-first search to find connected components"""
     visited[node] = True
@@ -98,6 +103,7 @@ def dfs(node, graph, visited, component):
     for neighbor in graph[node]:
         if not visited[neighbor]:
             dfs(neighbor, graph, visited, component)
+
 
 def postprocess_bboxes(bboxes, process_intersecting=True, iou_threshold=0.3, remove_contained=True):
     """
@@ -115,7 +121,6 @@ def postprocess_bboxes(bboxes, process_intersecting=True, iou_threshold=0.3, rem
         List of processed bounding boxes in the same format
     """
     processed_boxes = []
-
 
     # Main processing logic
     n = len(bboxes)

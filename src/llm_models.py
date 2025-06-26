@@ -1,7 +1,5 @@
 import os
 
-from langchain_openai import AzureChatOpenAI
-from sahi.models.ultralytics import UltralyticsDetectionModel
 from langchain_openai import AzureChatOpenAI, ChatOpenAI
 from langchain_openai.embeddings import AzureOpenAIEmbeddings
 
@@ -78,4 +76,3 @@ embedding_model = AzureOpenAIEmbeddings(
     # os.getenv("AZURE_OPENAI_ENDPOINT_US"),
     azure_deployment="ada-text-embedding",
 )
-
