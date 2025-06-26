@@ -8,7 +8,7 @@ from aiolimiter import AsyncLimiter
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
-from llm_models import AZURE_OPENAI_GPT_MODEL
+from src.llm_models import AZURE_OPENAI_GPT_MODEL
 from src.logger import logger
 
 SYS_PROMPT = """You are a multilingual manga localization expert with deep knowledge of various languages and cultures. Your task is to analyze dialogue images from manga, identify the source language, transcribe the original text, and create a high-quality English translation.

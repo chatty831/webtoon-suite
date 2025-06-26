@@ -12,7 +12,7 @@ from src.colorize.colorizer import colorize_batch
 from src.constants import DEVICE, DTYPE
 from src.enhance.upscale import upscale_image
 from src.logger import logger
-from src.ml_models import COLORIZER
+from src.ml_models import COLORIZER, DENOISER
 
 
 def is_url(path: str) -> bool:
@@ -66,7 +66,7 @@ def preprocess_images(base64_images: List[str]) -> List[np.ndarray]:
 
 def colorize_images(images: List[np.ndarray]) -> List[np.ndarray]:
     """Apply colorization to a batch of images."""
-    return colorize_batch(COLORIZER, images, DEVICE, DTYPE)
+    return colorize_batch(COLORIZER, DENOISER, images, DEVICE, DTYPE)
 
 
 def upscale_images(images: List[np.ndarray], scale_factor: int = 3) -> List[np.ndarray]:

@@ -1,4 +1,8 @@
+__pycache__/
+*.pyc
 models/*
 *.ipynb
 *.pem
 *.env
+translate_cache_dir/
+*.log

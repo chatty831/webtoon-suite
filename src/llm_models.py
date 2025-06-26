@@ -10,19 +10,19 @@ AZURE_OPENAI_GPT_MODEL = ChatOpenAI(
     openai_api_key=os.getenv("OPENAI_API_KEY"),
     model="gpt-4o-mini",
     temperature=0.0,
-    model_kwargs={"top_p": 1, "frequency_penalty": 0, "presence_penalty": 0},
+    top_p=1,
+    frequency_penalty=0,
+    presence_penalty=0,
 )
 
 GPT_MODEL_JSON = ChatOpenAI(
     openai_api_key=os.getenv("OPENAI_API_KEY"),
     model="gpt-4o-mini",
     temperature=0.0,
-    model_kwargs={
-        "top_p": 1,
-        "frequency_penalty": 0,
-        "presence_penalty": 0,
-        "response_format": {"type": "json_object"},
-    },
+    top_p=1,
+    frequency_penalty=0,
+    presence_penalty=0,
+    model_kwargs={"response_format": {"type": "json_object"}},
 )
 
 GPT_4o_MODEL = ChatOpenAI(
@@ -64,7 +64,7 @@ GPT_MODEL_JSON = AzureChatOpenAI(
     top_p=1,
     frequency_penalty=0,
     presence_penalty=0,
-    response_format={"type": "json_object"},
+    model_kwargs={"response_format": {"type": "json_object"}},
 )
 
 # embedding model

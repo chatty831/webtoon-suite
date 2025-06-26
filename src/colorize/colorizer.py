@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from colorize.colorize_model import Generator
+from src.colorize.colorize_model import Generator
 from src.colorize.denoise.denoiser import FFDNetDenoiser
 
 
@@ -14,10 +14,7 @@ def initialize_colorizator(generator_path):
     return generator
 
 
-denoiser = FFDNetDenoiser("cuda", weights_dir="denoising")
-
-
-def colorize_batch(colorizer, images, device="cuda", dtype=torch.float32):
+def colorize_batch(colorizer, denoiser: FFDNetDenoiser, images, device="cuda", dtype=torch.float32):
     """
     Colorizes a batch of RGB images using tiled inference.
 

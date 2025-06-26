@@ -2,6 +2,7 @@ import base64
 import json
 import os
 import re
+import sys
 import zipfile
 from io import BytesIO
 from typing import Any, Dict, List, Optional, Union
@@ -11,7 +12,8 @@ import streamlit as st
 from streamlit_extras.stylable_container import stylable_container
 from streamlit_shortcuts import add_keyboard_shortcuts, button
 
-from ..constants import FASTAPI_URL
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+from src.constants import FASTAPI_URL
 
 WIDTH = 750
 
