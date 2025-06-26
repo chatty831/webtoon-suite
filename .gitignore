@@ -1,0 +1,4 @@
+models/*
+*.ipynb
+*.pem
+*.env
