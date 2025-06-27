@@ -3,13 +3,15 @@ import os
 import torch
 from dotenv import load_dotenv
 
+from src.scraper.imhen import imhen_scraper
+
 load_dotenv()
 
 DEVICE = torch.device("cuda")
 DTYPE = torch.float32
 
 DOMAIN_MAPS = {
-    "imhentai.xxx": "",
+    "imhentai.xxx": imhen_scraper,
 }
 
 AZURE_OPENAI_API_KEY = os.environ.get("AZURE_OPENAI_API_KEY")

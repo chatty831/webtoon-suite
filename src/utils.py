@@ -78,11 +78,14 @@ def upscale_images(images: List[np.ndarray], scale_factor: int = 3) -> List[np.n
     return upscaled_images
 
 
-def convert_images_to_base64(images: List[np.ndarray]) -> List[str]:
+def convert_np_images_to_base64(images: List[np.ndarray]) -> List[str]:
     """Convert processed RGB images to base64 strings."""
     base64_images = []
 
     for img in images:
+        if img is None:
+            base64_images.append(None)
+            continue
         # Convert the image to a PIL Image
         pil_img = Image.fromarray(img)
         # Save the image to a buffer
@@ -93,3 +96,73 @@ def convert_images_to_base64(images: List[np.ndarray]) -> List[str]:
         base64_images.append(base64_str)
 
     return base64_images
+
+
+def convert_base64_to_np_images(base64_images: List[str]) -> List[np.ndarray]:
+    """Convert a list of base64 encoded strings to numpy images."""
+    np_images = []
+
+    for base64_str in base64_images:
+        if base64_str is None:
+            np_images.append(None)
+            continue
+        try:
+            # Decode the base64 string to bytes
+            image_data = base64.b64decode(base64_str)
+            # Convert bytes to a numpy array
+            img_array = np.frombuffer(image_data, dtype=np.uint8)
+            # Decode the numpy array to an image
+            img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+            # Convert BGR to RGB
+            img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            np_images.append(img_rgb)
+        except Exception as e:
+            logger.error(f"Error converting base64 to numpy image: {str(e)}")
+            raise
+
+    return np_images
+
+
+def convert_pil_images_to_base64(pil_images: List[Image.Image]) -> List[str]:
+    """Convert a list of PIL images to base64 encoded strings."""
+    base64_images = []
+
+    for pil_img in pil_images:
+        if pil_img is None:
+            base64_images.append(None)
+            continue
+        # Save the image to a buffer
+        buffer = BytesIO()
+        pil_img.save(buffer, format="JPEG")
+        # Convert buffer to base64 string
+        base64_str = base64.b64encode(buffer.getvalue()).decode("utf-8")
+        base64_images.append(base64_str)
+
+    return base64_images
+
+
+def convert_base64_to_pil_images(base64_images: List[str]) -> List[Image.Image]:
+    """Convert a list of base64 encoded strings to PIL images."""
+    pil_images = []
+
+    for base64_str in base64_images:
+        if base64_str is None:
+            pil_images.append(None)
+            continue
+        # Decode the base64 string to bytes
+        image_data = base64.b64decode(base64_str)
+        # Convert bytes to a numpy array
+        img_array = np.frombuffer(image_data, dtype=np.uint8)
+        # Decode the numpy array to an image using OpenCV
+        img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+        if img is not None:
+            # Convert BGR to RGB
+            img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            # Convert the numpy array to a PIL Image
+            pil_img = Image.fromarray(img_rgb)
+            pil_images.append(pil_img)
+        else:
+            logger.error("Error decoding image from base64 string.")
+            raise ValueError("Error decoding image from base64 string.")
+
+    return pil_images

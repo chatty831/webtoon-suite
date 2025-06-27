@@ -38,6 +38,7 @@ def initialize_session_state():
         "images": None,
         "translated_images": None,
         "page": 0,
+        "url_input": "",  # Added for URL input
     }
 
     for key, default_value in defaults.items():
@@ -226,6 +227,21 @@ def delete_cache_api(images: List[str]) -> bool:
         return False
 
 
+def scrape_images_api(url: str) -> Optional[List[str]]:
+    """Scrape images from URL via API."""
+    try:
+        response = requests.get(
+            url=f"{FASTAPI_URL}/scrape-images",
+            params={"url": url},
+            headers={"Content-Type": "application/json"},
+        )
+        response.raise_for_status()
+        return response.json()["scraped_images"]
+    except requests.exceptions.RequestException as e:
+        st.error(f"Scraping Error: {str(e)}")
+        return None
+
+
 # ============================================================================
 # File Download Functions
 # ============================================================================
@@ -254,6 +270,28 @@ def render_file_uploader():
     return st.file_uploader(
         "Select multiple images", accept_multiple_files=True, type=["jpg", "jpeg", "png", "webp", "bmp"]
     )
+
+
+def render_url_input_section():
+    """Render URL input section with textbox and button."""
+    st.markdown("---")
+    st.subheader("Or scrape images from URL")
+
+    col1, col2 = st.columns([3, 1])
+
+    with col1:
+        url_input = st.text_input(
+            "Enter URL to scrape images from:",
+            value=st.session_state.get("url_input", ""),
+            placeholder="https://example.com/manga-chapter",
+            key="url_input",
+        )
+
+    with col2:
+        st.markdown("<br>", unsafe_allow_html=True)  # Add spacing to align button
+        scrape_button = st.button("Scrape Images", type="secondary")
+
+    return url_input, scrape_button
 
 
 def render_control_panel():
@@ -317,6 +355,23 @@ def handle_image_upload(uploaded_files):
     st.success(f"Successfully processed {len(uploaded_files)} images")
 
 
+def handle_url_scraping(url: str):
+    """Handle the scraping of images from URL."""
+    if not url:
+        st.error("Please enter a valid URL")
+        return
+
+    with st.spinner("Scraping images from URL..."):
+        scraped_images = scrape_images_api(url)
+
+    if scraped_images:
+        st.session_state["translated_images"] = None
+        st.session_state["images"] = scraped_images
+        st.success(f"Successfully scraped {len(scraped_images)} images from URL")
+    else:
+        st.error("Failed to scrape images from the provided URL")
+
+
 def handle_image_processing():
     """Handle the API processing of images."""
     images = st.session_state["images"]
@@ -352,6 +407,13 @@ def main():
     # Handle uploaded files
     if process_uploaded and uploaded_files:
         handle_image_upload(uploaded_files)
+
+    # URL input section
+    url_input, scrape_button = render_url_input_section()
+
+    # Handle URL scraping
+    if scrape_button:
+        handle_url_scraping(url_input)
 
     # Action buttons
     actions = render_action_buttons()

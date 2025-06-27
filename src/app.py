@@ -1,3 +1,4 @@
+import re
 import traceback
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -7,12 +8,13 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from src.cache import update_cache_and_results
+from src.constants import DOMAIN_MAPS
 from src.endpoints.delete_cache import delete_images_cache
 from src.endpoints.process_images import check_cache_and_prepare_processing
 from src.logger import logger
 from src.ocr.bbox_identification import detect_text_regions
 from src.ocr.translate_bbox_cuts import translate_text_regions
-from src.utils import colorize_images, convert_images_to_base64, preprocess_images, upscale_images
+from src.utils import colorize_images, convert_np_images_to_base64, preprocess_images, upscale_images
 
 app = fastapi.FastAPI()
 
@@ -24,6 +26,14 @@ async def liveness_probe():
 
 class ImagesRequest(BaseModel):
     images: List[str | None]
+
+
+@app.get("/scrape-images")
+async def scrape_images(url: str):
+    domain = re.search(r"^(?:https?://)?(?:www\.)?([^/:]+)", url, re.IGNORECASE).group(1)
+    scrape_func = DOMAIN_MAPS[domain]
+    results = await scrape_func(url)
+    return {"scraped_images": results}
 
 
 @app.post("/delete-cache")
@@ -81,7 +91,7 @@ async def process_images(images_request: ImagesRequest, translate: bool, coloriz
             processed_images = upscale_images(processed_images, scale_factor=3)
 
         # Convert processed images back to base64
-        base64_results = convert_images_to_base64(processed_images)
+        base64_results = convert_np_images_to_base64(processed_images)
 
         # Update cache and merge results
         final_results = update_cache_and_results(base64_results, process_indices, cache_keys, final_results)
