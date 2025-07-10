@@ -16,6 +16,8 @@ def check_cache_and_prepare_processing(images: List[str], translate: bool, color
     cache_keys = []
 
     for i, b64_img in enumerate(images):
+        if not b64_img:
+            continue
         cache_key = generate_cache_key(b64_img, translate, colorize, upscale)
         cache_keys.append(cache_key)
 

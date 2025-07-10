@@ -5,7 +5,7 @@ import torch
 
 from src.colorize.colorize_model import Generator
 from src.colorize.denoise.denoiser import FFDNetDenoiser
-
+from src.data.config import DEFAULT_CONFIG
 
 def initialize_colorizator(generator_path):
     generator = Generator()
@@ -31,7 +31,8 @@ def colorize_batch(colorizer, denoiser: FFDNetDenoiser, images, device="cuda", d
         return []
 
     results = []
-    tile_size = 1280
+    tile_size = DEFAULT_CONFIG.get("image_tile_size")
+    denoise_sigma = DEFAULT_CONFIG.get("denoise_sigma")
 
     for img in images:
         # Ensure the image is in the correct format
@@ -43,7 +44,7 @@ def colorize_batch(colorizer, denoiser: FFDNetDenoiser, images, device="cuda", d
 
         # Convert RGB to grayscale
         bgr_img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
-        img = denoiser.get_denoised_image(bgr_img, sigma=50)
+        img = denoiser.get_denoised_image(bgr_img, sigma=denoise_sigma)
         img_gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
         height, width = img_gray.shape
 

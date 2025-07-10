@@ -23,7 +23,10 @@ def update_cache_and_results(
         orig_idx = process_indices[i]
 
         # Update the results array
-        final_results[orig_idx] = processed_img
+        try:
+            final_results[orig_idx] = processed_img
+        except IndexError:
+            continue
 
         # Cache the result using parameter-specific key
         cache_key = cache_keys[orig_idx]

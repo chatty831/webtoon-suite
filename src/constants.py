@@ -4,6 +4,7 @@ import torch
 from dotenv import load_dotenv
 
 from src.scraper.imhen import imhen_scraper
+from src.scraper.one_punch import one_punch_scraper
 
 load_dotenv()
 
@@ -12,6 +13,7 @@ DTYPE = torch.float32
 
 DOMAIN_MAPS = {
     "imhentai.xxx": imhen_scraper,
+    "onepunchmanmangaa.com": one_punch_scraper,
 }
 
 AZURE_OPENAI_API_KEY = os.environ.get("AZURE_OPENAI_API_KEY")
