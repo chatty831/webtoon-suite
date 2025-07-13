@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import os
 import sys
 from io import BytesIO
@@ -6,7 +7,6 @@ from queue import Queue
 
 import requests
 from bs4 import BeautifulSoup
-from seleniumbase import Driver
 
 semaphore = asyncio.Semaphore(30)
 
@@ -39,9 +39,6 @@ async def fetch_all(urls):
     tasks = [asyncio.create_task(fetch_html(url)) for url in urls]
     results = await asyncio.gather(*tasks)
     return results
-
-
-import base64
 
 
 async def fetch_image_base64(url):

@@ -7,6 +7,7 @@ from src.colorize.colorize_model import Generator
 from src.colorize.denoise.denoiser import FFDNetDenoiser
 from src.data.config import DEFAULT_CONFIG
 
+
 def initialize_colorizator(generator_path):
     generator = Generator()
     gen_st_dict = torch.load(generator_path, map_location="cpu")

@@ -5,8 +5,8 @@ from sahi.models.ultralytics import UltralyticsDetectionModel
 from src.colorize.colorizer import initialize_colorizator
 from src.colorize.denoise.denoiser import FFDNetDenoiser
 from src.constants import DEVICE
-from src.enhance.realesrgan import RealESRGANer
 from src.data.config import DEFAULT_CONFIG
+from src.enhance.realesrgan import RealESRGANer
 
 YOLO_MODEL_PATH = DEFAULT_CONFIG.get("detection_model_path")
 DENOISER_MODEL_PATH = DEFAULT_CONFIG.get("denoiser_model_path")
@@ -27,7 +27,7 @@ DENOISER = FFDNetDenoiser("cuda", weights_dir=DENOISER_MODEL_PATH)
 COLORIZER = initialize_colorizator(
     # generator_path="models/colorize_models/generator_1_rgb_2.pt",
     generator_path=COLORIZER_MODEL_PATH,
-).to(device=DEVICE, dtype=torch.float32) 
+).to(device=DEVICE, dtype=torch.float32)
 
 UPSCALE_MODEL = RealESRGANer(
     scale=4,

@@ -318,8 +318,8 @@ def render_action_buttons():
     actions = {}
 
     # Download button (if translated images exist)
-    if st.session_state.get("translated_images"):
-        if st.button("Download Images"):
+    if st.button("Download Images"):
+        if st.session_state.get("translated_images"):
             zip_buffer = create_images_zip(st.session_state["translated_images"])
             st.download_button(
                 label="Download All Images as ZIP",
