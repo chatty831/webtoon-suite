@@ -313,27 +313,6 @@ def render_control_panel():
     return process_uploaded
 
 
-def render_action_buttons():
-    """Render download and process buttons."""
-    actions = {}
-
-    # Download button (if translated images exist)
-    if st.button("Download Images"):
-        if st.session_state.get("translated_images"):
-            zip_buffer = create_images_zip(st.session_state["translated_images"])
-            st.download_button(
-                label="Download All Images as ZIP",
-                data=zip_buffer,
-                file_name="translated_images.zip",
-                mime="application/zip",
-            )
-
-    # Process button
-    actions["process"] = st.button("Process")
-
-    return actions
-
-
 def render_cache_delete_button():
     """Render the cache delete button."""
     if st.button("Delete Cache"):
@@ -341,6 +320,35 @@ def render_cache_delete_button():
             st.success("Cache deleted successfully.")
         else:
             st.error("Failed to delete cache.")
+
+
+def render_action_buttons():
+    """Render download and process buttons."""
+    actions = {}
+
+    action_button_cols = st.columns(3)
+
+    with action_button_cols[0]:
+        # Download button (if translated images exist)
+        if st.button("Download Images"):
+            if st.session_state.get("translated_images"):
+                zip_buffer = create_images_zip(st.session_state["translated_images"])
+                st.download_button(
+                    label="Download All Images as ZIP",
+                    data=zip_buffer,
+                    file_name="translated_images.zip",
+                    mime="application/zip",
+                )
+
+    with action_button_cols[1]:
+        # Process button
+        actions["process"] = st.button("Process")
+
+    with action_button_cols[2]:
+        if st.session_state.get("images"):
+            render_cache_delete_button()
+
+    return actions
 
 
 # ============================================================================
@@ -387,16 +395,38 @@ def handle_image_processing():
 def display_current_images():
     """Display either original or translated images based on state."""
     if st.session_state.get("images"):
+        # with action_button_cols[2]:
+        #     render_cache_delete_button()
         display_images_center(st.session_state["images"], width=WIDTH)
-        render_cache_delete_button()
     elif st.session_state.get("translated_images"):
         display_images_center(st.session_state["translated_images"], width=WIDTH)
 
 
-def main():
-    """Main application entry point."""
-    # Initialize session state
-    initialize_session_state()
+def handle_colorizer_model_change():
+    """Handle the colorization model change."""
+    option = st.session_state.get("colorization_model")
+    if option:
+        full_path = f"models/colorize_models/{option}"
+        response = requests.get(url=f"{FASTAPI_URL}/colorize-model-change", params={"model_path": full_path})
+        if response.ok:
+            st.success(f"Colorization model changed to {option}")
+        else:
+            st.error(f"Failed to change colorization model: {response.text}")
+
+
+def colorizer_model_change():
+    """Handle the colorization model change request."""
+    model_paths = os.listdir("models/colorize_models")
+
+    st.selectbox(
+        "Select Colorization Model",
+        options=model_paths,
+        key="colorization_model",
+        on_change=handle_colorizer_model_change,
+    )
+
+
+def tab1():
 
     # File upload section
     uploaded_files = render_file_uploader()
@@ -424,6 +454,27 @@ def main():
 
     # Display images
     display_current_images()
+
+
+def tab2():
+    # Model configuration section
+    st.subheader("Model Configuration")
+    colorizer_model_change()
+
+    st.markdown("---")
+
+
+def main():
+    """Main application entry point."""
+    # Initialize session state
+    initialize_session_state()
+
+    image_proc_tab, model_config_tab = st.tabs(["Image Processing", "Model Configuration"])
+
+    with image_proc_tab:
+        tab1()
+    with model_config_tab:
+        tab2()
 
 
 # Run the application

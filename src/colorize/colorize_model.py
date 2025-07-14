@@ -1,4 +1,5 @@
 import math
+import os
 
 import torch
 import torch.nn as nn
@@ -467,3 +468,12 @@ class Colorizer(nn.Module):
     def forward(self, x, extractor_grad=False):
         fake, guide = self.generator(x)
         return fake, guide
+
+    def load_weights(self, path: str, device: str | torch.device):
+        """
+        Load model weights from a specified path.
+        """
+        if os.path.exists(path):
+            self.generator.load_state_dict(torch.load(path, map_location=device))
+        else:
+            raise FileNotFoundError(f"Model weights file not found at {path}")

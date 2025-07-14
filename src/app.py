@@ -8,10 +8,12 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from src.cache import update_cache_and_results
-from src.constants import DOMAIN_MAPS
+from src.constants import DEVICE, DOMAIN_MAPS
+from src.endpoints.colorize_model_change import colorize_model_change
 from src.endpoints.delete_cache import delete_images_cache
 from src.endpoints.process_images import check_cache_and_prepare_processing
 from src.logger import logger
+from src.ml_models import COLORIZER
 from src.ocr.bbox_identification import detect_text_regions
 from src.ocr.translate_bbox_cuts import translate_text_regions
 from src.utils import colorize_images, convert_np_images_to_base64, preprocess_images, upscale_images
@@ -102,3 +104,12 @@ async def process_images(images_request: ImagesRequest, translate: bool, coloriz
         logger.error(f"Error processing images: {str(e)}")
         traceback.print_exc()
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Error processing images")
+
+
+@app.get("/colorize-model-change")
+async def colorize_model_change_endpoint(model_path: str):
+    """
+    Endpoint to change the colorization model.
+    This is a placeholder for future implementation.
+    """
+    return await colorize_model_change(model_path)

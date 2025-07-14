@@ -3,19 +3,29 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from src.colorize.colorize_model import Generator
+from src.colorize.colorize_model import Colorizer, Generator
 from src.colorize.denoise.denoiser import FFDNetDenoiser
+from src.constants import DEVICE
 from src.data.config import DEFAULT_CONFIG
+
+# def initialize_colorizator(generator_path):
+#     # generator = Generator()
+#     colorizer = Colorizer()
+#     gen_st_dict = torch.load(generator_path, map_location="cpu")
+#     colorizer.generator.load_state_dict(gen_st_dict)
+#     return colorizer
 
 
 def initialize_colorizator(generator_path):
-    generator = Generator()
-    gen_st_dict = torch.load(generator_path, map_location="cpu")
-    generator.load_state_dict(gen_st_dict)
-    return generator
+    """
+    Initialize the colorizer with the specified generator model path.
+    """
+    colorizer = Colorizer()
+    colorizer.load_weights(generator_path, "cpu")
+    return colorizer
 
 
-def colorize_batch(colorizer, denoiser: FFDNetDenoiser, images, device="cuda", dtype=torch.float32):
+def colorize_batch(colorizer: Colorizer, denoiser: FFDNetDenoiser, images, device="cuda", dtype=torch.float32):
     """
     Colorizes a batch of RGB images using tiled inference.
 
@@ -101,7 +111,7 @@ def colorize_batch(colorizer, denoiser: FFDNetDenoiser, images, device="cuda", d
         with torch.no_grad():
             for tile in tiles:
                 tile = tile.unsqueeze(0).to(device)  # Add batch dimension
-                output_tile1, output_tile2 = colorizer(tile)
+                output_tile1, output_tile2 = colorizer.generator(tile)
                 output_tiles_list.append(output_tile1.squeeze(0))  # Remove batch dimension
 
         # Stack the output tiles to form a batch tensor
