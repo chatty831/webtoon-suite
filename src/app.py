@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from src.cache import update_cache_and_results
 from src.constants import DEVICE, DOMAIN_MAPS
 from src.endpoints.colorize_model_change import colorize_model_change
+from src.endpoints.colorize_params_change import colorize_param_change
 from src.endpoints.delete_cache import delete_images_cache
 from src.endpoints.process_images import check_cache_and_prepare_processing
 from src.logger import logger
@@ -113,3 +114,12 @@ async def colorize_model_change_endpoint(model_path: str):
     This is a placeholder for future implementation.
     """
     return await colorize_model_change(model_path)
+
+
+@app.get("/colorize-param-change")
+async def colorize_param_change_endpoint(denoise_sigma: float, image_tile_size: int):
+    """
+    Endpoint to change the colorization parameters.
+    This is a placeholder for future implementation.
+    """
+    return await colorize_param_change(denoise_sigma=denoise_sigma, image_tile_size=image_tile_size)

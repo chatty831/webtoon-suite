@@ -5,8 +5,8 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "denoiser_model_path": "models/denoise_models",
     "denoise_sigma": 50,  # Default sigma for denoising
     # "denoise_sigma": 25,
-    "colorizer_model_path": "models/colorize_models/generator_1_rgb_2.pt",
-    # "colorizer_model_path": "models/colorize_models/generator.zip",
+    "colorizer_model_path": "models/colorize_models/henxxx.pt",
+    # "colorizer_model_path": "models/colorize_models/general_purpose.zip",
     "image_tile_size": 1280,
     # "image_tile_size": 768,
     "upscale_model_path": "models/upscale_models/RealESRGAN_x4plus.pth",

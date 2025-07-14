@@ -1,13 +1,6 @@
-import json
-import os
-import sys
-from typing import Any, Dict, List, Optional, Union
-
-import requests
-from fastapi import FastAPI, HTTPException, status
+from fastapi import HTTPException, status
 from fastapi.responses import JSONResponse
 
-from src.colorize.colorize_model import Colorizer
 from src.constants import DEVICE
 from src.logger import logger
 from src.ml_models import COLORIZER
