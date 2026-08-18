@@ -3,10 +3,9 @@ import base64
 from io import BytesIO
 from queue import Queue
 
-import requests
 from bs4 import BeautifulSoup
 
-from src.scraper.scraper_utils import fetch_all, fetch_html, get_all_images_base64
+from src.scraper.scraper_utils import fetch_all, fetch_html, get_all_images_base64, get_scraper_session
 
 semaphore = asyncio.Semaphore(30)
 
@@ -43,10 +42,11 @@ async def fetch_image_base64_imhen(url, _attempted_extensions=None):
     if current_ext:
         _attempted_extensions.add(current_ext)
 
+    session = get_scraper_session()
     for attempt in range(3):
         try:
             async with semaphore:
-                response = await asyncio.to_thread(requests.get, url, timeout=30)
+                response = await asyncio.to_thread(session.get, url, timeout=30)
                 if response.status_code == 200:
                     buffered = BytesIO(response.content)
                     return base64.b64encode(buffered.getvalue()).decode("utf-8")
@@ -92,6 +92,7 @@ async def imhen_scraper(page_link):
     # page link of type https://imhentai.xxx/gallery/1477517/
     res_text, res_html = await fetch_html(page_link)
     soup = BeautifulSoup(res_html, "html.parser")
+    # print(soup.prettify())
     pages = int("".join(filter(str.isdigit, soup.find(class_="pages").text)))
 
     # we convert to https://imhentai.xxx/view/1477517/1/

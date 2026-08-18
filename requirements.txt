@@ -1,6 +1,7 @@
 aiolimiter==1.2.1
 basicsr==1.4.2
 cachetools==5.5.2
+cloudscraper==1.2.71
 diskcache==5.6.3
 fastapi==0.115.14
 langchain_core==0.3.66

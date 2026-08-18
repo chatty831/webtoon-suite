@@ -1,4 +1,3 @@
-import requests
 from bs4 import BeautifulSoup
 
 from src.scraper.scraper_utils import fetch_all, fetch_html, get_all_images_base64

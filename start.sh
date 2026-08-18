@@ -20,7 +20,7 @@ trap cleanup SIGINT SIGTERM
 
 # Start backend
 echo "Starting backend..."
-CUDA_VISIBLE_DEVICES=1 uvicorn src.app:app --host 0.0.0.0 --port 9374 &
+CUDA_VISIBLE_DEVICES=0 uvicorn src.app:app --host 0.0.0.0 --port 9374 &
 BACKEND_PID=$!
 
 # Start frontend
