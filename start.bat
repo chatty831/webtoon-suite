@@ -1,6 +1,9 @@
 @echo off
 setlocal enabledelayedexpansion
 
+:: Activate conda environment
+call conda activate venv
+
 :: Configuration
 set BACKEND_PORT=9374
 set FRONTEND_PORT=8273
