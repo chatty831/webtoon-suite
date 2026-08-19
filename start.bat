@@ -10,6 +10,9 @@ set FRONTEND_PORT=8273
 set TIMEOUT_HOURS=2
 set /a TIMEOUT_SECONDS=%TIMEOUT_HOURS%*3600
 
+:: UI Mode: "streamlit" or "react"
+set UI_MODE=react
+
 :: Create unique session ID
 set SESSION_ID=%RANDOM%%RANDOM%
 
@@ -27,8 +30,13 @@ start /B cmd /c uvicorn src.app:app --host 0.0.0.0 --port %BACKEND_PORT% 2^>^&1
 timeout /t 2 /nobreak >nul
 
 :: Start Frontend Service in background (same window)
-echo Starting frontend...
-start /B cmd /c streamlit run src/frontend/st_app.py --server.port %FRONTEND_PORT% 2^>^&1
+if /I "%UI_MODE%"=="react" (
+    echo Starting React frontend...
+    start /B cmd /c "cd src\react-frontend && npx vite --port %FRONTEND_PORT% --host 0.0.0.0" 2^>^&1
+) else (
+    echo Starting Streamlit frontend...
+    start /B cmd /c streamlit run src/frontend/st_app.py --server.port %FRONTEND_PORT% 2^>^&1
+)
 
 :: Small delay to let frontend initialize
 timeout /t 2 /nobreak >nul
@@ -36,7 +44,7 @@ timeout /t 2 /nobreak >nul
 :: Display service information
 echo.
 echo Backend running on port: %BACKEND_PORT%
-echo Frontend running on port: %FRONTEND_PORT%
+echo Frontend (%UI_MODE%) running on port: %FRONTEND_PORT%
 echo Services will automatically stop after %TIMEOUT_HOURS% hours
 echo Press Ctrl+C to stop both services
 echo ==========================================
@@ -98,11 +106,20 @@ if not errorlevel 1 (
     echo Backend service was already stopped or not found.
 )
 
-taskkill /F /IM streamlit.exe >nul 2>&1
-if not errorlevel 1 (
-    echo Frontend service stopped.
+if /I "%UI_MODE%"=="react" (
+    taskkill /F /IM node.exe >nul 2>&1
+    if not errorlevel 1 (
+        echo React frontend service stopped.
+    ) else (
+        echo React frontend service was already stopped or not found.
+    )
 ) else (
-    echo Frontend service was already stopped or not found.
+    taskkill /F /IM streamlit.exe >nul 2>&1
+    if not errorlevel 1 (
+        echo Streamlit frontend service stopped.
+    ) else (
+        echo Streamlit frontend service was already stopped or not found.
+    )
 )
 
 :: Also try to kill Python processes running these specific scripts

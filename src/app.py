@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 
 import fastapi
 from fastapi import Body, HTTPException, Request, status
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
@@ -21,6 +22,14 @@ from src.ocr.translate_bbox_cuts import translate_text_regions
 from src.utils import colorize_images, colorize_images_comfyui, convert_np_images_to_base64, preprocess_images, upscale_images
 
 app = fastapi.FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/liveness-probe")
@@ -230,6 +239,16 @@ async def process_images_stream(
                     prefetch_task = asyncio.ensure_future(process_single_image(pi, pimg))
 
     return StreamingResponse(generate(), media_type="application/x-ndjson")
+
+
+@app.get("/list-colorize-models")
+async def list_colorize_models():
+    """Return available colorization model filenames."""
+    import os
+    model_dir = "models/colorize_models"
+    if os.path.isdir(model_dir):
+        return {"models": os.listdir(model_dir)}
+    return {"models": []}
 
 
 @app.get("/colorize-model-change")
