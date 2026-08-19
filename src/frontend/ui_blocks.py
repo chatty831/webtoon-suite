@@ -57,6 +57,25 @@ def render_control_panel():
     with col4:
         st.session_state["upscale"] = st.checkbox("Upscale", value=st.session_state["upscale"])
 
+    if st.session_state["colorize"]:
+        col_method, col_url = st.columns(2)
+
+        with col_method:
+            st.selectbox(
+                "Colorize Method",
+                options=["GAN", "ComfyUI"],
+                index=0,
+                key="colorize_method",
+            )
+
+        with col_url:
+            if st.session_state.get("colorize_method") == "ComfyUI":
+                st.text_input(
+                    "ComfyUI URL",
+                    value=st.session_state.get("comfyui_url", "http://localhost:9010"),
+                    key="comfyui_url",
+                )
+
     return process_uploaded
 
 

@@ -9,6 +9,7 @@ import numpy as np
 from PIL import Image
 
 from src.colorize.colorizer import colorize_batch
+from src.colorize.comfyui_colorizer import colorize_batch_comfyui
 from src.constants import DEVICE, DTYPE
 from src.enhance.upscale import upscale_image
 from src.logger import logger
@@ -67,6 +68,15 @@ def preprocess_images(base64_images: List[str]) -> List[np.ndarray]:
 def colorize_images(images: List[np.ndarray]) -> List[np.ndarray]:
     """Apply colorization to a batch of images."""
     return colorize_batch(COLORIZER, DENOISER, images, DEVICE, DTYPE)
+
+
+async def colorize_images_comfyui(
+    images: List[np.ndarray],
+    comfyui_url: str = "http://localhost:9010",
+    positive_prompt: Optional[str] = None,
+) -> List[np.ndarray]:
+    """Apply colorization to a batch of images using ComfyUI."""
+    return await colorize_batch_comfyui(images, comfyui_url, positive_prompt)
 
 
 def upscale_images(images: List[np.ndarray], scale_factor: int = 3) -> List[np.ndarray]:

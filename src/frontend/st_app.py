@@ -19,6 +19,7 @@ from src.frontend.image_utils import display_current_images
 from src.frontend.file_process_utils import process_uploaded_images
 from src.frontend.api_calls import (
     process_images_api,
+    process_images_stream_api,
     delete_cache_api,
     scrape_images_api,
     colorizer_model_change_api,
@@ -30,6 +31,7 @@ from src.frontend.ui_blocks import (
     render_file_uploader,
     render_url_input_section,
 )
+from src.frontend.image_utils import render_single_image
 from src.frontend.model_config import (
     colorize_param_change,
     colorizer_model_change
@@ -53,6 +55,8 @@ def initialize_session_state():
         "translate": True,
         "colorize": True,
         "upscale": True,
+        "colorize_method": "GAN",
+        "comfyui_url": "http://localhost:9010",
         "images": None,
         "translated_images": None,
         "page": 0,
@@ -94,15 +98,40 @@ def handle_url_scraping(url: str):
 
 
 def handle_image_processing():
-    """Handle the API processing of images."""
+    """Handle the API processing of images with progressive streaming display."""
     images = st.session_state["images"]
-    translated = process_images_api(
-        images, st.session_state["translate"], st.session_state["colorize"], st.session_state["upscale"]
-    )
+    colorize_method = st.session_state.get("colorize_method", "GAN").lower()
+    comfyui_url = st.session_state.get("comfyui_url", "http://localhost:9010")
 
-    if translated is not None:
-        st.session_state["images"] = None
-        st.session_state["translated_images"] = translated
+    n = len(images)
+    results = [None] * n
+
+    progress_bar = st.progress(0, text="Processing images...")
+    image_placeholder = st.empty()
+    completed = 0
+
+    for index, b64_img in process_images_stream_api(
+        images,
+        st.session_state["translate"],
+        st.session_state["colorize"],
+        st.session_state["upscale"],
+        colorize_method=colorize_method,
+        comfyui_url=comfyui_url,
+    ):
+        if index is not None and b64_img is not None:
+            results[index] = b64_img
+        completed += 1
+        progress_bar.progress(completed / n, text=f"Processed {completed}/{n} images")
+
+        with image_placeholder.container():
+            for img in results:
+                if img:
+                    render_single_image(img)
+
+    progress_bar.empty()
+    image_placeholder.empty()
+    st.session_state["images"] = None
+    st.session_state["translated_images"] = results
 
 
 def tab1():

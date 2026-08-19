@@ -1,6 +1,7 @@
+import json
 import requests 
 import streamlit as st
-from typing import List, Union, Optional, Dict, Any
+from typing import Generator, List, Tuple, Union, Optional, Dict, Any
 import re
 import os
 import sys
@@ -12,13 +13,26 @@ from src.constants import FASTAPI_URL
 # ============================================================================
 
 
-def process_images_api(images: List[str], translate: bool, colorize: bool, upscale: bool) -> Optional[List[str]]:
+def process_images_api(
+    images: List[str],
+    translate: bool,
+    colorize: bool,
+    upscale: bool,
+    colorize_method: str = "gan",
+    comfyui_url: str = "http://localhost:9010",
+) -> Optional[List[str]]:
     """Send images to API for processing."""
     try:
         response = requests.post(
             url=f"{FASTAPI_URL}/process-images",
             json={"images": images},
-            params={"translate": translate, "colorize": colorize, "upscale": upscale},
+            params={
+                "translate": translate,
+                "colorize": colorize,
+                "upscale": upscale,
+                "colorize_method": colorize_method,
+                "comfyui_url": comfyui_url,
+            },
             headers={"Content-Type": "application/json"},
         )
         response.raise_for_status()
@@ -26,6 +40,43 @@ def process_images_api(images: List[str], translate: bool, colorize: bool, upsca
     except requests.exceptions.RequestException as e:
         st.error(f"API Error: {str(e)}")
         return None
+
+
+def process_images_stream_api(
+    images: List[str],
+    translate: bool,
+    colorize: bool,
+    upscale: bool,
+    colorize_method: str = "gan",
+    comfyui_url: str = "http://localhost:9010",
+) -> Generator[Tuple[int, Optional[str]], None, None]:
+    """
+    Stream-process images via API. Yields (index, base64_image) tuples
+    as each image completes processing on the backend.
+    """
+    try:
+        response = requests.post(
+            url=f"{FASTAPI_URL}/process-images-stream",
+            json={"images": images},
+            params={
+                "translate": translate,
+                "colorize": colorize,
+                "upscale": upscale,
+                "colorize_method": colorize_method,
+                "comfyui_url": comfyui_url,
+            },
+            headers={"Content-Type": "application/json"},
+            stream=True,
+        )
+        response.raise_for_status()
+
+        for line in response.iter_lines(decode_unicode=True):
+            if line:
+                data = json.loads(line)
+                yield data.get("index"), data.get("image")
+
+    except requests.exceptions.RequestException as e:
+        st.error(f"API Streaming Error: {str(e)}")
 
 
 def delete_cache_api(images: List[str]) -> bool:
