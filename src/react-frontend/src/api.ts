@@ -14,9 +14,14 @@ export async function livenessProbe(): Promise<{ status: string }> {
 // Scrape images from URL
 // ---------------------------------------------------------------------------
 
-export async function scrapeImages(url: string): Promise<string[]> {
+export async function scrapeImages(
+  url: string,
+  sessionId?: string,
+): Promise<string[]> {
+  const params: Record<string, string> = { url };
+  if (sessionId) params.session_id = sessionId;
   const res = await fetch(
-    `${API_BASE}/scrape-images?${new URLSearchParams({ url })}`,
+    `${API_BASE}/scrape-images?${new URLSearchParams(params)}`,
   );
   if (!res.ok) throw new Error(`Scrape failed: ${res.statusText}`);
   const data = await res.json();
@@ -83,6 +88,7 @@ export async function* processImagesStream(
   images: (string | null)[],
   params: ProcessParams,
   signal?: AbortSignal,
+  sessionId?: string,
 ): AsyncGenerator<StreamChunk> {
   const qs = new URLSearchParams({
     translate: String(params.translate),
@@ -91,6 +97,7 @@ export async function* processImagesStream(
     colorize_method: params.colorize_method ?? "gan",
     comfyui_url: params.comfyui_url ?? "http://localhost:9010",
   });
+  if (sessionId) qs.set("session_id", sessionId);
   const res = await fetch(`${API_BASE}/process-images-stream?${qs}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -119,6 +126,14 @@ export async function* processImagesStream(
   if (buffer.trim()) {
     yield JSON.parse(buffer) as StreamChunk;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Session management
+// ---------------------------------------------------------------------------
+
+export async function cancelSession(sessionId: string): Promise<void> {
+  await fetch(`${API_BASE}/session/${sessionId}/cancel`, { method: "POST" });
 }
 
 // ---------------------------------------------------------------------------

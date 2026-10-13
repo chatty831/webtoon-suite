@@ -51,8 +51,8 @@ echo ==========================================
 echo.
 
 :: Store start time for timeout calculation
-for /f "tokens=1-3 delims=:." %%a in ("%TIME%") do (
-    set /a START_SECONDS=%%a*3600+%%b*60+%%c
+for /f "tokens=1-3 delims=:." %%a in ("%TIME: =0%") do (
+    set /a "START_SECONDS=(1%%a %% 100)*3600+(1%%b %% 100)*60+(1%%c %% 100)"
 )
 
 :MONITOR_LOOP
@@ -74,8 +74,8 @@ if errorlevel 1 (
 )
 
 :: Calculate elapsed time
-for /f "tokens=1-3 delims=:." %%a in ("%TIME%") do (
-    set /a CURRENT_SECONDS=%%a*3600+%%b*60+%%c
+for /f "tokens=1-3 delims=:." %%a in ("%TIME: =0%") do (
+    set /a "CURRENT_SECONDS=(1%%a %% 100)*3600+(1%%b %% 100)*60+(1%%c %% 100)"
 )
 
 :: Handle day rollover

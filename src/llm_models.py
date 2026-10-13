@@ -3,7 +3,7 @@ import os
 from langchain_openai import AzureChatOpenAI, ChatOpenAI
 from langchain_openai.embeddings import AzureOpenAIEmbeddings
 
-from src.constants import AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT
+from src.constants import AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT, NANO_API_KEY
 
 # Initialize model
 AZURE_OPENAI_GPT_MODEL = ChatOpenAI(
@@ -76,3 +76,27 @@ embedding_model = AzureOpenAIEmbeddings(
     # os.getenv("AZURE_OPENAI_ENDPOINT_US"),
     azure_deployment="ada-text-embedding",
 )
+
+# NanoGPT-backed models (multimodal + thinking)
+DEEPSEEK_V4_PRO_MODEL = None
+DEEPSEEK_V4_1_FLASH_MODEL = None
+MIMO_V2_6_PRO_MODEL = None
+if NANO_API_KEY:
+    DEEPSEEK_V4_PRO_MODEL = ChatOpenAI(
+        base_url="https://nano-gpt.com/api/v1",
+        openai_api_key=NANO_API_KEY,
+        model="deepseek/deepseek-v4-pro-0813:thinking",
+        temperature=0.2,
+    )
+    DEEPSEEK_V4_1_FLASH_MODEL = ChatOpenAI(
+        base_url="https://nano-gpt.com/api/v1",
+        openai_api_key=NANO_API_KEY,
+        model="deepseek/deepseek-v4.1-flash:thinking",
+        temperature=0.2,
+    )
+    MIMO_V2_6_PRO_MODEL = ChatOpenAI(
+        base_url="https://nano-gpt.com/api/v1",
+        openai_api_key=NANO_API_KEY,
+        model="xiaomi/mimo-v2.6-pro",
+        temperature=0.2,
+    )

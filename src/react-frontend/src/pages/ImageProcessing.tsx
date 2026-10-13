@@ -8,11 +8,15 @@ import ProgressBar from "../components/ProgressBar";
 import {
   processImagesStream,
   scrapeImages,
+  cancelSession,
   deleteCache,
   type ProcessParams,
 } from "../api";
 
 export default function ImageProcessing() {
+  // Unique session ID for this tab (generated once on mount)
+  const [sessionId] = useState(() => crypto.randomUUID());
+
   // Images state
   const [originalImages, setOriginalImages] = useState<(string | null)[]>([]);
   const [translatedImages, setTranslatedImages] = useState<(string | null)[]>(
@@ -61,7 +65,7 @@ export default function ImageProcessing() {
   const handleScrape = useCallback(
     async (url: string) => {
       try {
-        const imgs = await scrapeImages(url);
+        const imgs = await scrapeImages(url, sessionId);
         setTranslatedImages([]);
         setOriginalImages(imgs);
         showToast("success", `Scraped ${imgs.length} image(s) from URL`);
@@ -72,7 +76,7 @@ export default function ImageProcessing() {
         );
       }
     },
-    [showToast],
+    [showToast, sessionId],
   );
 
   // ---- Process images (streaming) ----
@@ -103,6 +107,7 @@ export default function ImageProcessing() {
         originalImages,
         params,
         ac.signal,
+        sessionId,
       )) {
         if (chunk.index != null && chunk.image) {
           results[chunk.index] = chunk.image;
@@ -132,7 +137,18 @@ export default function ImageProcessing() {
     colorizeMethod,
     comfyuiUrl,
     showToast,
+    sessionId,
   ]);
+
+  // ---- Cancel processing ----
+  const handleCancel = useCallback(() => {
+    // Tell server to drain all queued tasks for this session
+    cancelSession(sessionId).catch(() => {});
+    abortRef.current?.abort();
+    abortRef.current = null;
+    setProcessing(false);
+    showToast("error", "Processing cancelled");
+  }, [showToast, sessionId]);
 
   // ---- Delete cache ----
   const handleDeleteCache = useCallback(async () => {
@@ -206,6 +222,7 @@ export default function ImageProcessing() {
         hasTranslated={translatedImages.filter(Boolean).length > 0}
         processing={processing}
         onProcess={handleProcess}
+        onCancel={handleCancel}
         onDownload={handleDownload}
         onDeleteCache={handleDeleteCache}
       />

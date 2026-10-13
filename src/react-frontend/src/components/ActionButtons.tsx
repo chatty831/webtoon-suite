@@ -1,10 +1,11 @@
-import { Play, Download, Trash2, Loader2 } from "lucide-react";
+import { Play, Download, Trash2, Loader2, Square } from "lucide-react";
 
 interface Props {
   hasOriginal: boolean;
   hasTranslated: boolean;
   processing: boolean;
   onProcess: () => void;
+  onCancel: () => void;
   onDownload: () => void;
   onDeleteCache: () => void;
 }
@@ -14,6 +15,7 @@ export default function ActionButtons({
   hasTranslated,
   processing,
   onProcess,
+  onCancel,
   onDownload,
   onDeleteCache,
 }: Props) {
@@ -31,6 +33,16 @@ export default function ActionButtons({
         )}
         {processing ? "Processing..." : "Process"}
       </button>
+
+      {processing && (
+        <button
+          onClick={onCancel}
+          className="flex items-center gap-2 px-6 py-2.5 bg-orange-600 hover:bg-orange-500 text-white text-sm font-medium rounded-lg transition-colors"
+        >
+          <Square size={16} />
+          Stop
+        </button>
+      )}
 
       <button
         onClick={onDownload}

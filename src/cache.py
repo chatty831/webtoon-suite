@@ -1,11 +1,25 @@
 from typing import Any, Dict, List, Optional, Union
 
 import diskcache as dc
-from cachetools import TTLCache, cached
+from cachetools import LRUCache, TTLCache, cached
 
 from src.logger import logger
 
 image_ttl_cache = TTLCache(maxsize=10, ttl=3600)
+
+
+def _scrape_getsizeof(value):
+    """Estimate memory size of a list of base64 image strings in bytes."""
+    if isinstance(value, list):
+        return sum(len(s) if isinstance(s, str) else 0 for s in value)
+    return 1
+
+
+# 300MB LRU cache for scraped images, keyed by gallery URL
+scrape_lru_cache = LRUCache(
+    maxsize=300 * 1024 * 1024,  # 300MB
+    getsizeof=_scrape_getsizeof,
+)
 
 translate_dc_cache = dc.Cache(
     "translate_cache_dir",

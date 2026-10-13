@@ -30,7 +30,19 @@ async def upload_image_to_comfyui(
     temp_path = None
 
     try:
-        pil_img = PILImage.fromarray(image)
+        pil_img = PILImage.fromarray(image).convert("RGB")
+
+        # Resize for FLUX compatibility
+        w, h = pil_img.size
+        # Manga-page aspect ratio (~1.47:1) → fixed 1280×1880 (matches working pipeline)
+        if abs((h / w) - (1880 / 1280)) <= 0.07 * (1880 / 1280):
+            pil_img = pil_img.resize((1280, 1880), PILImage.LANCZOS)
+        else:
+            # Ensure dimensions are divisible by 16 (8× VAE factor × 2 for packing)
+            new_w = max(16, (w // 16) * 16)
+            new_h = max(16, (h // 16) * 16)
+            if new_w != w or new_h != h:
+                pil_img = pil_img.resize((new_w, new_h), PILImage.LANCZOS)
 
         unique_id = str(uuid.uuid4())[:8]
         unique_filename = f"manga_img_{image_index}_{unique_id}.png"
@@ -91,7 +103,7 @@ def create_comfyui_colorize_workflow(
         "37": {
             "class_type": "UNETLoader",
             "inputs": {
-                "unet_name": "fused_kontext_v2.safetensors",
+                "unet_name": "flux_kontext_colorize.safetensors",
                 "weight_dtype": "default",
             },
         },

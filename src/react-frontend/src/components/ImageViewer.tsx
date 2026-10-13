@@ -9,8 +9,8 @@ export default function ImageViewer({ images }: Props) {
   const [mode, setMode] = useState<"list" | "paginated">("paginated");
   const [page, setPage] = useState(0);
 
-  // Reset page when images change
-  useEffect(() => setPage(0), [images]);
+  // Reset page only when a new batch is loaded (length changes)
+  useEffect(() => setPage(0), [images.length]);
 
   // Clamp page
   const totalPages = images.length;

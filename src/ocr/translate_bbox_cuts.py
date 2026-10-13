@@ -2,6 +2,7 @@ import asyncio
 import base64
 import os
 import traceback
+import unicodedata
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import cv2
@@ -10,7 +11,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 from src.logger import logger
 from src.ml_models import FONT_MODEL_PATH
-from src.ocr.gpt_ocr import gpt_ocr
+from src.ocr.gpt_ocr import raw_ocr, contextual_translate
 
 
 def extract_cutout_to_base64(image: np.ndarray, bbox: List[float]) -> str:
@@ -50,6 +51,56 @@ def get_font(font_path, font_size):
         return ImageFont.load_default()
 
 
+# Map common Unicode characters to ASCII-safe equivalents for font rendering
+_UNICODE_REPLACEMENTS = {
+    "\u2018": "'",   # '
+    "\u2019": "'",   # '
+    "\u201C": '"',   # "
+    "\u201D": '"',   # "
+    "\u2014": "--",  # —  em dash
+    "\u2013": "-",   # –  en dash
+    "\u2026": "...", # …  ellipsis
+    "\u00A0": " ",   # non-breaking space
+    "\u200B": "",    # zero-width space
+    "\u00AB": '"',   # «
+    "\u00BB": '"',   # »
+    "\u2032": "'",   # ′  prime
+    "\u2033": '"',   # ″  double prime
+    "\u2010": "-",   # ‐  hyphen
+    "\u2011": "-",   # ‑  non-breaking hyphen
+    "\u2012": "-",   # ‒  figure dash
+    "\u00B7": ".",   # ·  middle dot
+    "\u2022": "*",   # •  bullet
+    "\u25CF": "*",   # ●  black circle
+    "\u2661": "<3",  # ♡
+    "\u2665": "<3",  # ♥
+    "\u266A": "~",   # ♪
+    "\u266B": "~",   # ♫
+    "\uFF01": "!",   # ！ fullwidth exclamation
+    "\uFF1F": "?",   # ？ fullwidth question mark
+    "\uFF0C": ",",   # ， fullwidth comma
+    "\uFF0E": ".",   # ． fullwidth period
+}
+
+
+def sanitize_text_for_font(text: str) -> str:
+    """Replace Unicode characters that may be missing from the manga font
+    with ASCII-safe equivalents, then strip any remaining non-printable chars."""
+    # Apply explicit replacements
+    for char, replacement in _UNICODE_REPLACEMENTS.items():
+        text = text.replace(char, replacement)
+
+    # Normalize remaining Unicode (e.g. accented chars -> base + combining)
+    # then drop anything that isn't printable ASCII or basic Latin-1
+    cleaned = []
+    for ch in unicodedata.normalize("NFKD", text):
+        if ord(ch) < 128 and ch.isprintable():
+            cleaned.append(ch)
+        elif ord(ch) == 10:  # keep newlines
+            cleaned.append(ch)
+    return "".join(cleaned)
+
+
 def draw_text_on_image(
     image: np.ndarray,
     text: str,
@@ -75,6 +126,12 @@ def draw_text_on_image(
     # Skip empty text
     if not text or text.strip() == "":
         logger.info(f"Skipping empty text for bbox {bbox}")
+        return
+
+    # Sanitize text to avoid missing-glyph boxes in the font
+    text = sanitize_text_for_font(text)
+    if not text or text.strip() == "":
+        logger.info(f"Text empty after sanitization for bbox {bbox}")
         return
 
     # Convert bbox coordinates to integers for drawing
@@ -379,30 +436,100 @@ def process_images_with_translations(
     return processed_base64_images
 
 
-async def translate_text_regions(images: List[np.ndarray], bbox_results: List[List]) -> List[np.ndarray]:
+def _image_to_base64(image: np.ndarray) -> str:
+    """Convert a full numpy image to base64 JPEG."""
+    _, buffer = cv2.imencode(".jpg", image)
+    return base64.b64encode(buffer).decode("utf-8")
+
+
+async def translate_text_regions(
+    images: List[np.ndarray],
+    bbox_results: List[List],
+    prev_page_context: Optional[Dict] = None,
+) -> Tuple[List[np.ndarray], Optional[Dict]]:
     """
-    Extract text regions, perform OCR/translation, and apply results to images.
+    Two-phase translation pipeline for a single page (or batch of pages).
+
+    Phase 1 - Raw OCR:  Extract text from each bbox cutout concurrently.
+    Phase 2 - Contextual Translation:  Send the full page image + all raw
+              OCR texts to the LLM in one call for coherent translation.
+
+    Args:
+        images: List of page images as numpy arrays (typically one page).
+        bbox_results: Per-image list of bboxes from YOLO detection.
+        prev_page_context: Optional dict from the previous page:
+            {"original": [str, ...], "translated": [str, ...]}
+
+    Returns:
+        (translated_images, page_context)
+        - translated_images: images with translated text pasted on
+        - page_context: dict to pass as prev_page_context for the next page
     """
-    # Prepare all inference tasks
-    all_tasks = []
-    all_cutout_info = []
+    all_cutout_info: List[Tuple[int, List[float]]] = []
+    all_translations: List[str] = []
+    page_context: Optional[Dict] = None
 
     for local_idx, bboxes in enumerate(bbox_results):
+        if not bboxes:
+            continue
+
+        # --- Phase 1: Raw OCR (concurrent) ---
+        ocr_tasks = []
         for bbox in bboxes:
-            # Extract the region and convert to base64
             base64_cutout = extract_cutout_to_base64(images[local_idx], bbox)
-            # Create inference task
-            task = asyncio.create_task(gpt_ocr(base64_cutout))
-            all_tasks.append(task)
-            # Store info using local index
+            ocr_tasks.append(asyncio.create_task(raw_ocr(base64_cutout)))
+
+        ocr_results = await asyncio.gather(*ocr_tasks, return_exceptions=True)
+
+        # Collect successful OCR results; replace failures with empty string
+        raw_texts: List[str] = []
+        for i, result in enumerate(ocr_results):
+            if isinstance(result, Exception):
+                logger.error(f"Raw OCR failed for bbox {i}: {result}")
+                raw_texts.append("")
+            else:
+                raw_texts.append(result or "")
+
+        logger.info(
+            f"[Phase 1] Raw OCR complete for image {local_idx}: "
+            f"{sum(1 for t in raw_texts if t)} / {len(raw_texts)} bboxes yielded text"
+        )
+
+        # --- Phase 2: Contextual translation (single call) ---
+        full_page_b64 = _image_to_base64(images[local_idx])
+
+        try:
+            translations = await contextual_translate(
+                full_page_base64=full_page_b64,
+                raw_texts=raw_texts,
+                prev_page_context=prev_page_context,
+            )
+        except Exception as e:
+            logger.error(f"[Phase 2] Contextual translation failed for image {local_idx}: {e}")
+            traceback.print_exc()
+            translations = [""] * len(raw_texts)
+
+        logger.info(
+            f"[Phase 2] Translation complete for image {local_idx}: "
+            f"{sum(1 for t in translations if t)} / {len(translations)} translated"
+        )
+
+        # Build cutout info and collect translations
+        for bbox, translated_text in zip(bboxes, translations):
             all_cutout_info.append((local_idx, bbox))
+            all_translations.append(translated_text)
 
-    # Run all inference tasks
-    inference_results = await asyncio.gather(*all_tasks, return_exceptions=True)
+        # Build page context for the next page
+        page_context = {
+            "original": raw_texts,
+            "translated": translations,
+        }
 
-    logger.info(f"Processing {len(inference_results)} regions from {len(images)} images")
+    logger.info(f"Processing {len(all_translations)} regions from {len(images)} images")
 
     # Apply translations to images
-    translated_images = process_images_with_translations(images, inference_results, all_cutout_info, font_size=None)
+    translated_images = process_images_with_translations(
+        images, all_translations, all_cutout_info, font_size=None
+    )
 
-    return translated_images
+    return translated_images, page_context
