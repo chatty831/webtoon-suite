@@ -11,7 +11,9 @@ from PIL import Image, ImageDraw, ImageFont
 
 from src.logger import logger
 from src.ml_models import FONT_MODEL_PATH
-from src.ocr.gpt_ocr import raw_ocr, contextual_translate
+from src.ocr.gpt_ocr import batch_raw_ocr, contextual_translate
+
+OCR_BATCH_SIZE = 5  # Number of bbox cutouts sent per LLM OCR call
 
 
 def extract_cutout_to_base64(image: np.ndarray, bbox: List[float]) -> str:
@@ -442,94 +444,133 @@ def _image_to_base64(image: np.ndarray) -> str:
     return base64.b64encode(buffer).decode("utf-8")
 
 
+async def ocr_page(image: np.ndarray, bboxes: List[List[float]]) -> List[str]:
+    """
+    Phase 1: Extract raw OCR from all bboxes on a page using batched LLM calls.
+
+    Cutouts are grouped into batches of OCR_BATCH_SIZE and sent concurrently.
+    No rate-limiting — OCR is unbounded for maximum throughput.
+
+    Returns:
+        List of raw OCR strings, same length as bboxes.
+    """
+    if not bboxes:
+        return []
+
+    cutout_b64s = [extract_cutout_to_base64(image, bbox) for bbox in bboxes]
+
+    # Fire all batches concurrently
+    batch_tasks = []
+    for start in range(0, len(cutout_b64s), OCR_BATCH_SIZE):
+        batch = cutout_b64s[start : start + OCR_BATCH_SIZE]
+        batch_tasks.append(asyncio.create_task(batch_raw_ocr(batch)))
+
+    batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
+
+    # Flatten results, handling errors per-batch
+    raw_texts: List[str] = []
+    for batch_idx, result in enumerate(batch_results):
+        batch_start = batch_idx * OCR_BATCH_SIZE
+        batch_size = min(OCR_BATCH_SIZE, len(cutout_b64s) - batch_start)
+        if isinstance(result, Exception):
+            logger.error(f"Batch OCR failed for batch {batch_idx}: {result}")
+            raw_texts.extend([""] * batch_size)
+        else:
+            # Pad/truncate to expected batch size
+            texts = list(result)
+            if len(texts) < batch_size:
+                texts.extend([""] * (batch_size - len(texts)))
+            elif len(texts) > batch_size:
+                texts = texts[:batch_size]
+            raw_texts.extend(texts)
+
+    logger.info(
+        f"[OCR] Batch OCR complete: {sum(1 for t in raw_texts if t)}/{len(raw_texts)} "
+        f"bboxes yielded text ({len(batch_tasks)} batches)"
+    )
+    return raw_texts
+
+
+async def translate_and_render_page(
+    image: np.ndarray,
+    bboxes: List[List[float]],
+    raw_texts: List[str],
+    prev_page_raw_ocr: Optional[List[str]] = None,
+) -> np.ndarray:
+    """
+    Phase 2: Contextual translation + rendering for a single page.
+
+    Sends the full page image + all raw OCR texts to the LLM for coherent
+    translation, then renders translated text onto the image.
+
+    Args:
+        image: Page image as numpy array.
+        bboxes: Detected text bounding boxes.
+        raw_texts: Raw OCR results from ocr_page().
+        prev_page_raw_ocr: Raw OCR from the previous page for context.
+
+    Returns:
+        Modified image with translated text rendered.
+    """
+    if not bboxes or not raw_texts:
+        return image
+
+    full_page_b64 = _image_to_base64(image)
+
+    try:
+        translations = await contextual_translate(
+            full_page_base64=full_page_b64,
+            raw_texts=raw_texts,
+            prev_page_raw_ocr=prev_page_raw_ocr,
+        )
+    except Exception as e:
+        logger.error(f"Contextual translation failed: {e}")
+        traceback.print_exc()
+        translations = [""] * len(raw_texts)
+
+    logger.info(
+        f"[Translate] {sum(1 for t in translations if t)}/{len(translations)} snippets translated"
+    )
+
+    cutout_info = [(0, bbox) for bbox in bboxes]
+    [result_image] = process_images_with_translations(
+        [image], translations, cutout_info, font_size=None
+    )
+    return result_image
+
+
 async def translate_text_regions(
     images: List[np.ndarray],
     bbox_results: List[List],
-    prev_page_context: Optional[Dict] = None,
-) -> Tuple[List[np.ndarray], Optional[Dict]]:
+    prev_page_raw_ocr: Optional[List[str]] = None,
+) -> Tuple[List[np.ndarray], Optional[List[str]]]:
     """
-    Two-phase translation pipeline for a single page (or batch of pages).
+    Convenience wrapper: batch OCR + contextual translation + rendering.
 
-    Phase 1 - Raw OCR:  Extract text from each bbox cutout concurrently.
-    Phase 2 - Contextual Translation:  Send the full page image + all raw
-              OCR texts to the LLM in one call for coherent translation.
+    Used by the batch endpoint.  The streaming endpoint calls ocr_page() and
+    translate_and_render_page() directly for finer-grained concurrency control.
 
     Args:
-        images: List of page images as numpy arrays (typically one page).
+        images: List of page images as numpy arrays.
         bbox_results: Per-image list of bboxes from YOLO detection.
-        prev_page_context: Optional dict from the previous page:
-            {"original": [str, ...], "translated": [str, ...]}
+        prev_page_raw_ocr: Raw OCR texts from the previous page for context.
 
     Returns:
-        (translated_images, page_context)
-        - translated_images: images with translated text pasted on
-        - page_context: dict to pass as prev_page_context for the next page
+        (translated_images, last_page_raw_ocr)
     """
-    all_cutout_info: List[Tuple[int, List[float]]] = []
-    all_translations: List[str] = []
-    page_context: Optional[Dict] = None
+    last_raw_ocr: Optional[List[str]] = None
 
     for local_idx, bboxes in enumerate(bbox_results):
         if not bboxes:
             continue
 
-        # --- Phase 1: Raw OCR (concurrent) ---
-        ocr_tasks = []
-        for bbox in bboxes:
-            base64_cutout = extract_cutout_to_base64(images[local_idx], bbox)
-            ocr_tasks.append(asyncio.create_task(raw_ocr(base64_cutout)))
-
-        ocr_results = await asyncio.gather(*ocr_tasks, return_exceptions=True)
-
-        # Collect successful OCR results; replace failures with empty string
-        raw_texts: List[str] = []
-        for i, result in enumerate(ocr_results):
-            if isinstance(result, Exception):
-                logger.error(f"Raw OCR failed for bbox {i}: {result}")
-                raw_texts.append("")
-            else:
-                raw_texts.append(result or "")
-
-        logger.info(
-            f"[Phase 1] Raw OCR complete for image {local_idx}: "
-            f"{sum(1 for t in raw_texts if t)} / {len(raw_texts)} bboxes yielded text"
+        raw_texts = await ocr_page(images[local_idx], bboxes)
+        images[local_idx] = await translate_and_render_page(
+            images[local_idx], bboxes, raw_texts, prev_page_raw_ocr
         )
 
-        # --- Phase 2: Contextual translation (single call) ---
-        full_page_b64 = _image_to_base64(images[local_idx])
+        # Chain context: this page's OCR feeds the next page
+        prev_page_raw_ocr = raw_texts
+        last_raw_ocr = raw_texts
 
-        try:
-            translations = await contextual_translate(
-                full_page_base64=full_page_b64,
-                raw_texts=raw_texts,
-                prev_page_context=prev_page_context,
-            )
-        except Exception as e:
-            logger.error(f"[Phase 2] Contextual translation failed for image {local_idx}: {e}")
-            traceback.print_exc()
-            translations = [""] * len(raw_texts)
-
-        logger.info(
-            f"[Phase 2] Translation complete for image {local_idx}: "
-            f"{sum(1 for t in translations if t)} / {len(translations)} translated"
-        )
-
-        # Build cutout info and collect translations
-        for bbox, translated_text in zip(bboxes, translations):
-            all_cutout_info.append((local_idx, bbox))
-            all_translations.append(translated_text)
-
-        # Build page context for the next page
-        page_context = {
-            "original": raw_texts,
-            "translated": translations,
-        }
-
-    logger.info(f"Processing {len(all_translations)} regions from {len(images)} images")
-
-    # Apply translations to images
-    translated_images = process_images_with_translations(
-        images, all_translations, all_cutout_info, font_size=None
-    )
-
-    return translated_images, page_context
+    return images, last_raw_ocr

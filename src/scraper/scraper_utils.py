@@ -90,12 +90,13 @@ async def fetch_all(urls):
     return results
 
 
-async def fetch_image_base64(url):
+async def fetch_image_base64(url, headers=None):
     """
     Fetch an image from a URL and return its base64 encoded string.
 
     Args:
         url (str): The URL of the image to fetch.
+        headers (dict, optional): Optional HTTP headers (e.g. Referer).
 
     Returns:
         str: The base64 encoded string of the image, or None if fetching fails.
@@ -104,7 +105,7 @@ async def fetch_image_base64(url):
     for attempt in range(3):
         try:
             async with semaphore:
-                response = await asyncio.to_thread(session.get, url)
+                response = await asyncio.to_thread(session.get, url, headers=headers)
                 if response.status_code == 200:
                     buffered = BytesIO(response.content)
                     return base64.b64encode(buffered.getvalue()).decode("utf-8")
@@ -115,16 +116,17 @@ async def fetch_image_base64(url):
     return None
 
 
-async def get_all_images_base64(image_urls):
+async def get_all_images_base64(image_urls, headers=None):
     """
     Fetch images from a list of URLs asynchronously and return their base64 encoded strings.
 
     Args:
         image_urls (list): A list of image URLs to fetch.
+        headers (dict, optional): Optional HTTP headers to include in the requests.
 
     Returns:
         list: A list of base64 encoded strings of the images, or None for failed fetches.
     """
-    tasks = [asyncio.create_task(fetch_image_base64(url)) for url in image_urls]
+    tasks = [asyncio.create_task(fetch_image_base64(url, headers=headers)) for url in image_urls]
     base64_images = await asyncio.gather(*tasks)
     return base64_images

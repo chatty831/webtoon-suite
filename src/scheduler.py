@@ -216,4 +216,4 @@ class TaskScheduler:
 # ---------------------------------------------------------------------------
 
 scrape_scheduler = TaskScheduler(concurrency=3, name="scrape")
-process_scheduler = TaskScheduler(concurrency=5, name="process")
+process_scheduler = TaskScheduler(concurrency=7, name="process")

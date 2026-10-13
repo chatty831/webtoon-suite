@@ -21,7 +21,7 @@ from src.endpoints.process_images import check_cache_and_prepare_processing
 from src.logger import logger
 from src.ml_models import COLORIZER
 from src.ocr.bbox_identification import detect_text_regions
-from src.ocr.translate_bbox_cuts import translate_text_regions
+from src.ocr.translate_bbox_cuts import ocr_page, translate_and_render_page, translate_text_regions
 from src.scheduler import process_scheduler, scrape_scheduler
 from src.utils import colorize_images, colorize_images_comfyui, convert_np_images_to_base64, preprocess_images, upscale_images
 
@@ -222,16 +222,35 @@ async def process_images_stream(
     Streaming endpoint that yields NDJSON as each image finishes.
     Format per line: {"index": <int>, "image": <base64_str>}
 
-    All image tasks are submitted to the global process_scheduler which
-    enforces priority ordering across sessions (tabs).  Within one session,
-    tasks execute in submission order and share a page_contexts dict for
-    opportunistic cross-page translation context.
+    Pipeline per page (within the process_scheduler):
+      Phase 1 — YOLO + batch OCR (unbounded, no rate limit)
+        → signals page_ocr_events[i] when done
+      Phase 2 — Contextual translation (rate-limited by LLM semaphore)
+        → waits for page_ocr_events[i-1] so previous page's raw OCR
+          is available as narrative context
+
+    All pages' OCR runs in parallel.  Since OCR is fast and unbounded,
+    by the time any page reaches Phase 2 the previous page's OCR is
+    almost always already complete, so translations also run in parallel.
     """
     if not session_id:
         session_id = str(_uuid.uuid4())
 
-    # Shared across all tasks in this session for translation continuity
-    page_contexts: dict = {}
+    # Shared state across all page tasks in this session
+    page_ocr_events: dict[int, asyncio.Event] = {}   # signaled when OCR finishes
+    page_ocr_texts: dict[int, list[str]] = {}         # raw OCR results per page
+
+    # Build work list
+    images = images_request.images or []
+    work_items = [(i, img) for i, img in enumerate(images) if img]
+
+    if not work_items:
+        return StreamingResponse(iter([]), media_type="application/x-ndjson")
+
+    # Pre-create OCR events for all pages (so any page can wait on its predecessor)
+    if translate:
+        for i, _ in work_items:
+            page_ocr_events[i] = asyncio.Event()
 
     def make_process_factory(i: int, b64_img: str):
         """Build a closure that processes one image through the full pipeline."""
@@ -240,12 +259,14 @@ async def process_images_stream(
             from src.utils import generate_cache_key
             from src.cache import translate_dc_cache
 
-            page_context = None
-
             try:
                 cache_key = generate_cache_key(b64_img, translate, colorize, upscale)
                 if cache_key in translate_dc_cache:
                     logger.info(f"[Stream] Cache hit for image {i}")
+                    # Signal OCR done even for cached pages so next page doesn't hang
+                    if i in page_ocr_events:
+                        page_ocr_texts[i] = []
+                        page_ocr_events[i].set()
                     result_b64 = translate_dc_cache[cache_key]
                     return json.dumps({"index": i, "image": result_b64}) + "\n"
 
@@ -253,20 +274,28 @@ async def process_images_stream(
                 img = processed[0]
 
                 if translate:
+                    # Phase 1: YOLO + batch OCR (unbounded parallelism)
                     bbox_results = detect_text_regions([img])
+                    bboxes = bbox_results[0] if bbox_results else []
 
-                    prev_ctx = page_contexts.get(i - 1)
-                    if prev_ctx:
-                        logger.info(f"[Stream] Page {i} using context from page {i - 1}")
-                    else:
-                        logger.info(f"[Stream] Page {i} proceeding without previous context")
+                    raw_texts = await ocr_page(img, bboxes) if bboxes else []
+                    page_ocr_texts[i] = raw_texts
+                    page_ocr_events[i].set()
+                    logger.info(f"[Stream] Page {i} OCR done ({len(raw_texts)} texts)")
 
-                    [img], page_context = await translate_text_regions(
-                        [img], bbox_results, prev_page_context=prev_ctx
-                    )
+                    # Phase 2: Wait for previous page's OCR, then translate
+                    if bboxes and raw_texts:
+                        prev_event = page_ocr_events.get(i - 1)
+                        if prev_event:
+                            await prev_event.wait()
+                            logger.info(f"[Stream] Page {i} using OCR context from page {i - 1}")
+                        else:
+                            logger.info(f"[Stream] Page {i} proceeding without previous context")
 
-                    if page_context is not None:
-                        page_contexts[i] = page_context
+                        prev_raw = page_ocr_texts.get(i - 1)
+                        img = await translate_and_render_page(
+                            img, bboxes, raw_texts, prev_raw
+                        )
 
                 if colorize:
                     if colorize_method == "comfyui":
@@ -287,16 +316,13 @@ async def process_images_stream(
             except Exception as e:
                 logger.error(f"[Stream] Error processing image {i}: {str(e)}")
                 traceback.print_exc()
+                # Signal OCR done even on error so next page doesn't hang
+                if i in page_ocr_events and not page_ocr_events[i].is_set():
+                    page_ocr_texts[i] = []
+                    page_ocr_events[i].set()
                 return json.dumps({"index": i, "image": None, "error": str(e)}) + "\n"
 
         return factory
-
-    # Build work list
-    images = images_request.images or []
-    work_items = [(i, img) for i, img in enumerate(images) if img]
-
-    if not work_items:
-        return StreamingResponse(iter([]), media_type="application/x-ndjson")
 
     # Submit all image tasks to the scheduler
     factories = [make_process_factory(i, img) for i, img in work_items]

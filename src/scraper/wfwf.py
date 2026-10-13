@@ -24,5 +24,9 @@ async def wfwf_scraper(page_link):
         else:
             img_urls.append("https://" + domain + actual_src)
 
-    base64_images = await get_all_images_base64(img_urls)
+    headers = {
+        "Referer": page_link,
+        "Accept": "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
+    }
+    base64_images = await get_all_images_base64(img_urls, headers=headers)
     return base64_images

@@ -81,22 +81,29 @@ embedding_model = AzureOpenAIEmbeddings(
 DEEPSEEK_V4_PRO_MODEL = None
 DEEPSEEK_V4_1_FLASH_MODEL = None
 MIMO_V2_6_PRO_MODEL = None
+GLM_5_3_FLASH_MODEL = None
 if NANO_API_KEY:
     DEEPSEEK_V4_PRO_MODEL = ChatOpenAI(
         base_url="https://nano-gpt.com/api/v1",
         openai_api_key=NANO_API_KEY,
         model="deepseek/deepseek-v4-pro-0813:thinking",
-        temperature=0.2,
+        temperature=0.7,
     )
     DEEPSEEK_V4_1_FLASH_MODEL = ChatOpenAI(
         base_url="https://nano-gpt.com/api/v1",
         openai_api_key=NANO_API_KEY,
         model="deepseek/deepseek-v4.1-flash:thinking",
-        temperature=0.2,
+        temperature=0.7,
+    )
+    GLM_5_3_FLASH_MODEL = ChatOpenAI(
+        base_url="https://nano-gpt.com/api/v1",
+        openai_api_key=NANO_API_KEY,
+        model="z-ai/glm-5.3-flash",
+        temperature=0.7,
     )
     MIMO_V2_6_PRO_MODEL = ChatOpenAI(
         base_url="https://nano-gpt.com/api/v1",
         openai_api_key=NANO_API_KEY,
         model="xiaomi/mimo-v2.6-pro",
-        temperature=0.2,
+        temperature=0.7,
     )

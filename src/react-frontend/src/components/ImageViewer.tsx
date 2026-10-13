@@ -65,9 +65,9 @@ export default function ImageViewer({ images }: Props) {
       </div>
 
       {mode === "list" ? (
-        <div className="space-y-4">
+        <div className="flex flex-col items-center">
           {images.map((img, i) => (
-            <ImageCard key={i} image={img} index={i} />
+            <ImageCard key={i} image={img} index={i} seamless />
           ))}
         </div>
       ) : (
@@ -105,10 +105,18 @@ export default function ImageViewer({ images }: Props) {
   );
 }
 
-function ImageCard({ image, index }: { image: string | null; index: number }) {
+function ImageCard({
+  image,
+  index,
+  seamless = false,
+}: {
+  image: string | null;
+  index: number;
+  seamless?: boolean;
+}) {
   if (!image) {
     return (
-      <div className="flex justify-center">
+      <div className="flex justify-center w-full">
         <div className="w-[750px] max-w-full aspect-square border-2 border-dashed border-gray-700 rounded-xl flex items-center justify-center text-gray-600 text-lg">
           Image {index + 1} — processing...
         </div>
@@ -117,11 +125,11 @@ function ImageCard({ image, index }: { image: string | null; index: number }) {
   }
 
   return (
-    <div className="flex justify-center">
+    <div className="flex justify-center w-full">
       <img
         src={`data:image/jpeg;base64,${image}`}
         alt={`Image ${index + 1}`}
-        className="max-w-[750px] w-full rounded-lg shadow-lg"
+        className={`max-w-[750px] w-full ${seamless ? "block" : "rounded-lg shadow-lg"}`}
       />
     </div>
   );
